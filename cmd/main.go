@@ -1,35 +1,40 @@
 package main
 
 import (
-	"log"
-
 	"github.com/AnuragChaubey2/JobManagerService/db"
 	"github.com/AnuragChaubey2/JobManagerService/migration"
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 func main() {
-	err := godotenv.Load()
+	logger, err := zap.NewProduction()
 	if err != nil {
-		log.Fatalf("Error loading .env file")
+		panic("Failed to initialize zap logger")
+	}
+	defer logger.Sync()
+
+	err = godotenv.Load()
+	if err != nil {
+		logger.Fatal("Error loading .env file")
 	}
 
 	pgConn, err := db.ConnectToDB()
 	if err != nil {
-		log.Fatalf("Error connecting to the PostgreSQL database: %v", err)
+		logger.Fatal("Error connecting to the PostgreSQL database", zap.Error(err))
 	}
 	defer db.CloseDB()
 
 	_, err = db.ConnectToRedis()
 	if err != nil {
-		log.Fatalf("Error connecting to Redis: %v", err)
+		logger.Fatal("Error connecting to Redis", zap.Error(err))
 	}
 	defer db.CloseRedis()
 
 	err = migration.MigrateDatabase(pgConn, "db/migrations/schema.sql")
 	if err != nil {
-		log.Fatalf("Migration error: %v", err)
+		logger.Fatal("Migration error", zap.Error(err))
 	}
 
-	log.Println("Connections to PostgreSQL and Redis are established. Application is ready to use.")
+	logger.Info("Connections to PostgreSQL and Redis are established. Application is ready to use.")
 }
